@@ -3,6 +3,8 @@ import 'package:chat/components/button.dart';
 import 'package:chat/components/textField.dart';
 import 'package:chat/pages/forgetPage.dart';
 import 'package:chat/pages/registerPage.dart';
+import 'package:chat/services/auth.dart';
+import 'package:chat/utils/validation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,35 +18,112 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
 
+  final FocusNode _emailFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
+
+  String? errorMessage = '';
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  void signIn() async {
+  bool _isEmailValid = true;
+  bool _isPasswordValid = true;
+  bool _isObscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> signInWithEmailAndPassword() async {
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      _isEmailValid = Validation.isValidEmail(emailController.text);
+      _isPasswordValid = Validation.isValidPassword(passwordController.text);
+    });
+
+    if (!_isEmailValid || !_isPasswordValid) {
+      _showValidationErrorDialog();
+      return;
+    }
+
     showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator())
     );
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim()
+      await Auth().signInWithEmailAndPassword(
+        email: emailController.text,
+        password: passwordController.text,
       );
 
       Navigator.of(context).pop();
-
       Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const RegisterPage())
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
       );
     } on FirebaseAuthException catch (e) {
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Login failed'))
-      );
+      _showFirebaseErrorDialog(e.message ?? 'Registration failed');
     }
   }
+
+  void _showValidationErrorDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Validation Error'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!_isEmailValid)
+              Text(
+
+                Validation.getEmailErrorMessage(emailController.text) ?? '',
+                style: GoogleFonts.outfit(fontSize: 14, color: Colors.red),
+              ),
+            if (!_isPasswordValid)
+              Text(
+                Validation.getPasswordErrorMessage(passwordController.text) ?? '',
+                style: GoogleFonts.outfit(fontSize: 14, color: Colors.red),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFirebaseErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Registration Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -86,17 +165,42 @@ class _LoginPageState extends State<LoginPage> {
                             style: GoogleFonts.outfit(fontSize: 14,
                                 color: Colors.grey),
                           ),
-                          const SizedBox(height: 20,),
+                          const SizedBox(height: 20),
                           TextFieldInput(
                             textEditingController: emailController,
+                            focusNode: _emailFocusNode,
                             fieldName: 'Email',
                             hintText: 'Enter your email',
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            onSubmitted: (_) {
+                              FocusScope.of(context).requestFocus(_passwordFocusNode);
+                            },
                           ),
-                          const SizedBox(height: 20,),
+                          const SizedBox(height: 20),
                           TextFieldInput(
                             textEditingController: passwordController,
+                            focusNode: _passwordFocusNode,
                             fieldName: 'Password',
                             hintText: 'Enter your password',
+                            obscureText: _isObscurePassword,
+                            keyboardType: TextInputType.visiblePassword,
+                            textInputAction: TextInputAction.done,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                  _isObscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isObscurePassword = !_isObscurePassword;
+                                });
+                              },
+                            ),
+                            onSubmitted: (_) {
+                              signInWithEmailAndPassword();
+                            },
                           ),
                           const SizedBox(height: 8,),
                           Align(
@@ -118,8 +222,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 28,),
-                          MyButton(onTap: signIn, text: 'Log In'),
-                          SizedBox(height: size.height/8,),
+                          MyButton(onTap: signInWithEmailAndPassword, text: 'Log In'),
+                          const Spacer(),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
