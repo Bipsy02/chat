@@ -95,7 +95,6 @@ class _InboxPageState extends State<InboxPage> {
                       final conversationData =
                       conversations[index].data() as Map<String, dynamic>;
 
-                      // Determine the other participant's UID
                       final otherUserId =
                       (conversationData['participants'] as List)
                           .firstWhere((id) => id != _auth.currentUser!.uid);
@@ -121,7 +120,7 @@ class _InboxPageState extends State<InboxPage> {
                               child: userData['profilePicUrl'] == null
                                   ? Text(
                                 userData['name'][0].toUpperCase(),
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.outfit(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 18),
                               )
@@ -129,7 +128,7 @@ class _InboxPageState extends State<InboxPage> {
                             ),
                             title: Text(
                               userData['name'],
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 16,
                               ),
@@ -138,7 +137,7 @@ class _InboxPageState extends State<InboxPage> {
                               conversationData['lastMessage'] ?? 'No messages yet',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.outfit(
                                 fontSize: 14,
                                 color: Colors.grey,
                               ),
@@ -148,7 +147,7 @@ class _InboxPageState extends State<InboxPage> {
                                   ? _formatTimestamp(
                                   conversationData['lastMessageTime'])
                                   : '',
-                              style: GoogleFonts.poppins(
+                              style: GoogleFonts.outfit(
                                 color: Colors.grey,
                                 fontSize: 12,
                               ),

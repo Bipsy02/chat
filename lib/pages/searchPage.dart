@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,21 +20,30 @@ class _SearchUserPageState extends State<SearchPage> {
   bool _isSearching = false;
 
   Future<void> _startChat(String otherUserId) async {
-    final currentUserId = _auth.currentUser!.uid;
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('User is not authenticated')),
+      );
+      return;
+    }
 
     try {
       final existingChatQuery = await _firestore
           .collection('chats')
           .where('participants', arrayContains: currentUserId)
-          .where('participants', arrayContains: otherUserId)
           .get();
 
-      String chatId;
-      if (existingChatQuery.docs.isNotEmpty) {
-        // Chat already exists
-        chatId = existingChatQuery.docs.first.id;
-      } else {
-        // Create a new chat
+      String? chatId;
+      for (var doc in existingChatQuery.docs) {
+        final participants = doc['participants'] as List<dynamic>;
+        if (participants.contains(otherUserId) && participants.length == 2) {
+          chatId = doc.id;
+          break;
+        }
+      }
+
+      if (chatId == null) {
         final chatRef = await _firestore.collection('chats').add({
           'participants': [currentUserId, otherUserId],
           'createdAt': FieldValue.serverTimestamp(),
@@ -43,22 +51,23 @@ class _SearchUserPageState extends State<SearchPage> {
         chatId = chatRef.id;
       }
 
-      // Navigate to chat page
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => ChatPage(
-            chatId: chatId,
+            chatId: chatId!,
             otherUserId: otherUserId,
           ),
         ),
       );
     } catch (e) {
+      print('Error starting chat: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error starting chat: $e')),
       );
     }
   }
+
 
   void _searchUsers(String query) async {
     if (query.isEmpty) {
@@ -85,7 +94,6 @@ class _SearchUserPageState extends State<SearchPage> {
 
       setState(() {
         _searchResults = querySnapshot.docs.where((doc) {
-          // Additional filter to exclude the current user
           final userData = doc.data();
           return userData['email'] != _auth.currentUser!.email;
         }).toList();
@@ -136,7 +144,7 @@ class _SearchUserPageState extends State<SearchPage> {
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search by name or email',
-                      hintStyle: GoogleFonts.poppins(color: Colors.grey),
+                      hintStyle: GoogleFonts.outfit(color: Colors.grey),
                       border: InputBorder.none,
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.search, color: Colors.grey),
@@ -144,7 +152,7 @@ class _SearchUserPageState extends State<SearchPage> {
                       ),
                     ),
                     onSubmitted: _searchUsers,
-                    style: GoogleFonts.poppins(
+                    style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -164,58 +172,58 @@ class _SearchUserPageState extends State<SearchPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : _searchResults.isEmpty
                     ? Center(
-                        child: Text(
-                          'No users found',
-                          style: GoogleFonts.poppins(),
-                        ),
-                      )
-                    : ListView.separated(
-                      separatorBuilder: (context, index) => const Divider(
-                        height: 1,
-                        color: Colors.grey,
+                      child: Text(
+                        'No users found',
+                        style: GoogleFonts.outfit(),
                       ),
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        final userData = _searchResults[index].data()
-                        as Map<String, dynamic>;
-
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          leading: CircleAvatar(
-                            radius: 24,
-                            backgroundImage:
-                            userData['profilePicUrl'] != null
-                                ? NetworkImage(userData['profilePicUrl'])
-                                : null,
-                            child: userData['profilePicUrl'] == null
-                                ? Text(
-                              userData['name'][0].toUpperCase(),
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            )
-                                : null,
-                          ),
-                          title: Text(
-                            userData['name'],
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Text(
-                            userData['email'],
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          onTap: () => _startChat(_searchResults[index].id),
-                        );
-                      },
+                    )
+                  : ListView.separated(
+                    separatorBuilder: (context, index) => const Divider(
+                      height: 1,
+                      color: Colors.grey,
                     ),
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final userData = _searchResults[index].data()
+                      as Map<String, dynamic>;
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        leading: CircleAvatar(
+                          radius: 24,
+                          backgroundImage:
+                          userData['profilePicUrl'] != null
+                              ? NetworkImage(userData['profilePicUrl'])
+                              : null,
+                          child: userData['profilePicUrl'] == null
+                              ? Text(
+                            userData['name'][0].toUpperCase(),
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          )
+                              : null,
+                        ),
+                        title: Text(
+                          userData['name'],
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                          ),
+                        ),
+                        subtitle: Text(
+                          userData['email'],
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        onTap: () => _startChat(_searchResults[index].id),
+                      );
+                    },
+                  ),
             ),
           ),
         ],
