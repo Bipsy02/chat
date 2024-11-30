@@ -2,9 +2,9 @@
 import 'package:chat/components/button.dart';
 import 'package:chat/components/textField.dart';
 import 'package:chat/pages/forgetPage.dart';
+import 'package:chat/pages/inboxPage.dart';
 import 'package:chat/pages/registerPage.dart';
 import 'package:chat/services/auth.dart';
-import 'package:chat/utils/validation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -26,8 +26,6 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  bool _isEmailValid = true;
-  bool _isPasswordValid = true;
   bool _isObscurePassword = true;
 
   @override
@@ -42,16 +40,6 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> signInWithEmailAndPassword() async {
     FocusScope.of(context).unfocus();
 
-    setState(() {
-      _isEmailValid = Validation.isValidEmail(emailController.text);
-      _isPasswordValid = Validation.isValidPassword(passwordController.text);
-    });
-
-    if (!_isEmailValid || !_isPasswordValid) {
-      _showValidationErrorDialog();
-      return;
-    }
-
     showDialog(
         context: context,
         barrierDismissible: false,
@@ -59,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
     );
 
     try {
-      await Auth().signInWithEmailAndPassword(
+      UserCredential userCredential = await Auth().signInWithEmailAndPassword(
         email: emailController.text,
         password: passwordController.text,
       );
@@ -67,52 +55,19 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.of(context).pop();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
+        MaterialPageRoute(builder: (context) => const InboxPage()),
       );
     } on FirebaseAuthException catch (e) {
       Navigator.of(context).pop();
-
-      _showFirebaseErrorDialog(e.message ?? 'Registration failed');
+      _showFirebaseErrorDialog(e.message ?? 'Login failed');
     }
-  }
-
-  void _showValidationErrorDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Validation Error'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!_isEmailValid)
-              Text(
-
-                Validation.getEmailErrorMessage(emailController.text) ?? '',
-                style: GoogleFonts.outfit(fontSize: 14, color: Colors.red),
-              ),
-            if (!_isPasswordValid)
-              Text(
-                Validation.getPasswordErrorMessage(passwordController.text) ?? '',
-                style: GoogleFonts.outfit(fontSize: 14, color: Colors.red),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showFirebaseErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Registration Error'),
+        title: const Text('Login Error'),
         content: Text(message),
         actions: [
           TextButton(
@@ -123,7 +78,6 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {

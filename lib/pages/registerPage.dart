@@ -1,9 +1,9 @@
-
 import 'package:chat/components/button.dart';
 import 'package:chat/components/textField.dart';
 import 'package:chat/pages/loginPage.dart';
 import 'package:chat/services/auth.dart';
 import 'package:chat/utils/validation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,9 +16,11 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
+  final FocusNode _nameFocusNode = FocusNode();
 
   String? errorMessage = '';
 
@@ -29,11 +31,14 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isEmailValid = true;
   bool _isPasswordValid = true;
   bool _isObscurePassword = true;
+  bool _isNameValid = true;
 
   @override
   void dispose() {
     _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
+    _nameFocusNode.dispose();
+    nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -45,24 +50,29 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() {
       _isEmailValid = Validation.isValidEmail(emailController.text);
       _isPasswordValid = Validation.isValidPassword(passwordController.text);
+      _isNameValid = nameController.text.trim().isNotEmpty;
     });
 
-    if (!_isEmailValid || !_isPasswordValid) {
+    if (!_isEmailValid || !_isPasswordValid || !_isNameValid) {
       _showValidationErrorDialog();
       return;
     }
 
     showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator())
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
-      await Auth().createUserWithEmailAndPassword(
+      UserCredential userCredential = await Auth().createUserWithEmailAndPassword(
         email: emailController.text,
         password: passwordController.text,
       );
+
+      if (userCredential.user != null) {
+        await _storeUserDataInFirestore(userCredential.user!);
+      }
 
       Navigator.of(context).pop();
       Navigator.pushReplacement(
@@ -71,9 +81,43 @@ class _RegisterPageState extends State<RegisterPage> {
       );
     } on FirebaseAuthException catch (e) {
       Navigator.of(context).pop();
-
       _showFirebaseErrorDialog(e.message ?? 'Registration failed');
     }
+  }
+
+  Future<void> _storeUserDataInFirestore(User user) async {
+    try {
+      List<String> searchIndex = [];
+      String name = nameController.text.trim();
+      String email = emailController.text.trim();
+
+      searchIndex.addAll(_generateSearchTokens(name));
+      searchIndex.addAll(_generateSearchTokens(email));
+
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': name,
+        'email': email,
+        'searchIndex': searchIndex,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLogin': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error storing user data: $e');
+    }
+  }
+
+  List<String> _generateSearchTokens(String input) {
+    input = input.toLowerCase();
+    Set<String> tokens = {};
+
+    tokens.add(input);
+
+    for (int i = 1; i <= input.length; i++) {
+      tokens.add(input.substring(0, i));
+    }
+
+    return tokens.toList();
   }
 
   void _showValidationErrorDialog() {
@@ -85,9 +129,13 @@ class _RegisterPageState extends State<RegisterPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (!_isNameValid)
+              Text(
+                'Name cannot be empty',
+                style: GoogleFonts.outfit(fontSize: 14, color: Colors.red),
+              ),
             if (!_isEmailValid)
               Text(
-
                 Validation.getEmailErrorMessage(emailController.text) ?? '',
                 style: GoogleFonts.outfit(fontSize: 14, color: Colors.red),
               ),
@@ -167,6 +215,18 @@ class _RegisterPageState extends State<RegisterPage> {
                               fontSize: 14,
                               color: Colors.grey,
                             ),
+                          ),
+                          const SizedBox(height: 20),
+                          TextFieldInput(
+                            textEditingController: nameController,
+                            focusNode: _nameFocusNode,
+                            fieldName: 'Name',
+                            hintText: 'Enter your name',
+                            keyboardType: TextInputType.name,
+                            textInputAction: TextInputAction.next,
+                            onSubmitted: (_) {
+                              FocusScope.of(context).requestFocus(_emailFocusNode);
+                            },
                           ),
                           const SizedBox(height: 20),
                           TextFieldInput(
