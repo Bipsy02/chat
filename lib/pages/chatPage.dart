@@ -34,7 +34,7 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     final currentUserId = _auth.currentUser!.uid;
-    _encryptionKey = Encryption.generateKeyFromUserIds(  // Changed from 'encryption'
+    _encryptionKey = Encryption.generateKeyFromUserIds(
         currentUserId,
         widget.otherUserId
     );
@@ -45,12 +45,11 @@ class _ChatPageState extends State<ChatPage> {
 
     final currentUser = _auth.currentUser!;
 
-    // Encrypt message text and image
     final encryptedText = textMessage != null
-        ? Encryption.encryptData(textMessage, _encryptionKey)  // Changed from 'encryption'
+        ? Encryption.encryptData(textMessage, _encryptionKey)
         : null;
     final encryptedImage = imageUrl != null
-        ? Encryption.encryptData(imageUrl, _encryptionKey)  // Changed from 'encryption'
+        ? Encryption.encryptData(imageUrl, _encryptionKey)
         : null;
 
     final messageData = {
@@ -129,7 +128,6 @@ class _ChatPageState extends State<ChatPage> {
                       final messageData = messages[index].data() as Map<String, dynamic>;
                       final bool isMe = messageData['senderId'] == _auth.currentUser!.uid;
 
-                      // Decrypt the imageUrl and text
                       final encryptedImageUrl = messageData['imageUrl'];
                       final encryptedText = messageData['text'];
 
@@ -145,7 +143,6 @@ class _ChatPageState extends State<ChatPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Display the decrypted image only if it exists
                               if (encryptedImageUrl != null)
                                 Image.memory(
                                   base64Decode(
@@ -158,7 +155,6 @@ class _ChatPageState extends State<ChatPage> {
                                   width: 200,
                                 ),
 
-                              // Display the decrypted text
                               if (encryptedText != null)
                                 Text(
                                   Encryption.decryptData(

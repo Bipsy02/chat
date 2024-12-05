@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -113,120 +114,130 @@ class _SearchUserPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.only(left: 20, top: 30, right: 20, bottom: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(15),
-                bottomRight: Radius.circular(15),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(15),
+                  bottomRight: Radius.circular(15),
+                ),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.5),
-                  spreadRadius: 2,
-                  blurRadius: 5,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by name or email',
-                      hintStyle: GoogleFonts.outfit(color: Colors.grey),
-                      border: InputBorder.none,
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search, color: Colors.grey),
-                        onPressed: () => _searchUsers(_searchController.text),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or email',
+                        hintStyle: GoogleFonts.outfit(color: Colors.grey),
+                        border: InputBorder.none,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.search, color: Colors.grey),
+                          onPressed: () => _searchUsers(_searchController.text.trim()),
+                        ),
+                      ),
+                      onSubmitted: _searchUsers,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    onSubmitted: _searchUsers,
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 1),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(15),
+                    topRight: Radius.circular(15),
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 1),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: _isSearching
-                  ? const Center(child: CircularProgressIndicator())
-                  : _searchResults.isEmpty
+                child: _isSearching
+                    ? const Center(child: CircularProgressIndicator())
+                    : _searchResults.isEmpty && _searchController.text.isNotEmpty
                     ? Center(
                       child: Text(
                         'No users found',
                         style: GoogleFonts.outfit(),
                       ),
                     )
-                  : ListView.separated(
-                    separatorBuilder: (context, index) => const Divider(
-                      height: 1,
-                      color: Colors.grey,
+                    : _searchResults.isEmpty
+                    ? Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(15),
+                        topRight: Radius.circular(15),
+                      ),
                     ),
-                    itemCount: _searchResults.length,
-                    itemBuilder: (context, index) {
-                      final userData = _searchResults[index].data()
-                      as Map<String, dynamic>;
+                    width: double.infinity,
+                    height: double.infinity,
+                  )
+                    : ListView.separated(
+                      separatorBuilder: (context, index) => const Divider(
+                        height: 1,
+                        color: Colors.grey,
+                      ),
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        final userData = _searchResults[index].data()
+                        as Map<String, dynamic>;
 
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        leading: CircleAvatar(
-                          radius: 24,
-                          backgroundImage:
-                          userData['profilePicUrl'] != null
-                              ? NetworkImage(userData['profilePicUrl'])
-                              : null,
-                          child: userData['profilePicUrl'] == null
-                              ? Text(
-                            userData['name'][0].toUpperCase(),
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          leading: CircleAvatar(
+                            radius: 24,
+                            backgroundImage:
+                            userData['profilePicUrl'] != null
+                                ? NetworkImage(userData['profilePicUrl'])
+                                : null,
+                            child: userData['profilePicUrl'] == null
+                                ? Text(
+                              userData['name'][0].toUpperCase(),
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            )
+                                : null,
+                          ),
+                          title: Text(
+                            userData['name'],
                             style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 16,
                             ),
-                          )
-                              : null,
-                        ),
-                        title: Text(
-                          userData['name'],
-                          style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
                           ),
-                        ),
-                        subtitle: Text(
-                          userData['email'],
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            color: Colors.grey,
+                          subtitle: Text(
+                            userData['email'],
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
                           ),
-                        ),
-                        onTap: () => _startChat(_searchResults[index].id),
-                      );
-                    },
-                  ),
-            ),
-          ),
-        ],
+                          onTap: () => _startChat(_searchResults[index].id),
+                        );
+                      },
+                    ),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
