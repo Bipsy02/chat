@@ -1,3 +1,4 @@
+
 import 'package:chat/components/button.dart';
 import 'package:chat/components/textField.dart';
 import 'package:chat/pages/loginPage.dart';
@@ -71,18 +72,96 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (userCredential.user != null) {
-        await _storeUserDataInFirestore(userCredential.user!);
-      }
+        await userCredential.user!.sendEmailVerification();
 
-      Navigator.of(context).pop();
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+        Navigator.of(context).pop();
+
+        _showEmailVerificationDialog(userCredential.user!);
+      }
     } on FirebaseAuthException catch (e) {
       Navigator.of(context).pop();
       _showFirebaseErrorDialog(e.message ?? 'Registration failed');
     }
+  }
+
+  void _showEmailVerificationDialog(User user) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Verify Your Email'),
+        content: Text(
+          'A verification link has been sent to ${user.email}. '
+              'Please check your email and click the link to complete registration.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              try {
+                await user.reload();
+
+                final currentUser = FirebaseAuth.instance.currentUser;
+
+                if (currentUser != null && currentUser.emailVerified) {
+                  await _storeUserDataInFirestore(currentUser);
+
+                  Navigator.of(context).pop();
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                  );
+                } else {
+                  await user.delete();
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Registration failed. Please try again.'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                print('Error checking email verification: $e');
+
+                try {
+                  await user.delete();
+                } catch (deleteError) {
+                  print('Error deleting user: $deleteError');
+                }
+
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Registration failed. Please try again.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: const Text('I have verified my email'),
+          ),
+          TextButton(
+            onPressed: () {
+              user.sendEmailVerification();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Verification email resent'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Resend Verification Email'),
+          ),
+          TextButton(
+            onPressed: () {
+              user.delete();
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancel Registration'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _storeUserDataInFirestore(User user) async {

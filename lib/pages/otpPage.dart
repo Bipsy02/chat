@@ -1,20 +1,18 @@
-
-import 'package:chat/components/button.dart';
-import 'package:chat/components/textField.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:chat/components/button.dart';
 
 class OtpPage extends StatefulWidget {
-  const OtpPage({super.key});
+  final String email;
+
+  const OtpPage({Key? key, required this.email}) : super(key: key);
 
   @override
   State<OtpPage> createState() => _OtpPageState();
 }
 
 class _OtpPageState extends State<OtpPage> {
-
-  final TextEditingController otpController = TextEditingController();
-
   @override
   Widget build(BuildContext context) {
     var size = MediaQuery.of(context).size;
@@ -36,29 +34,41 @@ class _OtpPageState extends State<OtpPage> {
                   ),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 34,left: 18, right: 20, bottom:24),
+                  padding: const EdgeInsets.only(top: 34, left: 18, right: 20, bottom: 24),
                   child: Column(
                     children: [
                       Text(
-                        'Recover Account',
-                        style: GoogleFonts.outfit(fontSize: 28,
-                            fontWeight: FontWeight.bold),
+                        'Check Your Email',
+                        style: GoogleFonts.outfit(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(height: 8,),
+                      const SizedBox(height: 8),
                       Text(
-                        'OTP code has been sent to your email.'
-                            'Please enter the OTP code below.',
-                        style: GoogleFonts.outfit(fontSize: 14,
-                            color: Colors.grey),
+                        'A password reset link has been sent to ${widget.email}',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
                       ),
-                      const SizedBox(height: 20,),
-                      TextFieldInput(
-                        textEditingController: otpController,
-                        fieldName: '',
-                        hintText: 'Enter OTP code',
+                      const SizedBox(height: 20),
+                      Text(
+                        'Please check your email and click on the reset link to proceed.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: Colors.black54,
+                        ),
                       ),
-                      const SizedBox(height: 28,),
-                      MyButton(onTap: (){}, text: 'Verify'),
+                      const SizedBox(height: 28),
+                      MyButton(
+                          onTap: () {
+                            _resendResetLink();
+                          },
+                          text: 'Resend Reset Link'
+                      ),
                     ],
                   ),
                 ),
@@ -68,5 +78,18 @@ class _OtpPageState extends State<OtpPage> {
         ),
       ),
     );
+  }
+
+  void _resendResetLink() async {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: widget.email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reset link resent successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to resend reset link: ${e.toString()}')),
+      );
+    }
   }
 }
