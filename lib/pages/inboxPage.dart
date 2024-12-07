@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'package:chat/utils/encryption.dart';
@@ -128,8 +127,19 @@ class _InboxPageState extends State<InboxPage> {
                               .limit(1)
                               .snapshots(),
                           builder: (context, messageSnapshot) {
-                            if (!messageSnapshot.hasData) {
-                              return const SizedBox.shrink();
+                            if (!messageSnapshot.hasData || messageSnapshot.data!.docs.isEmpty) {
+                              return Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    'No messages yet',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                              );
                             }
 
                             final messageData = messageSnapshot.data!.docs.first.data() as Map<String, dynamic>;
