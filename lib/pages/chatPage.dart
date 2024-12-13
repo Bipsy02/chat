@@ -1,12 +1,12 @@
+
 import 'dart:convert';
 import 'dart:io';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:encrypt/encrypt.dart' as encrypt;
 
 import '../utils/imageHandler.dart';
-import '../utils/encryption.dart'; 
 
 class ChatPage extends StatefulWidget {
   final String chatId;
@@ -24,20 +24,28 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final ImageHandler _imageHandler = ImageHandler();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final TextEditingController _messageController = TextEditingController();
 
-  late encrypt.Key _encryptionKey;
+  final TextEditingController _messageController = TextEditingController();
+  String? _otherUserName;
 
   @override
   void initState() {
     super.initState();
-    final currentUserId = _auth.currentUser!.uid;
-    _encryptionKey = Encryption.generateKeyFromUserIds(
-        currentUserId,
-        widget.otherUserId
-    );
+    _fetchOtherUserName();
+  }
+
+  Future<void> _fetchOtherUserName() async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(widget.otherUserId).get();
+      setState(() {
+        _otherUserName = userDoc.data()?['name'] ?? 'Unknown User';
+      });
+    } catch (e) {
+      print('Error fetching user name: $e');
+    }
   }
 
   Future<void> _sendMessage({String? textMessage, String? imageUrl}) async {
@@ -45,31 +53,29 @@ class _ChatPageState extends State<ChatPage> {
 
     final currentUser = _auth.currentUser!;
 
-    final encryptedText = textMessage != null
-        ? Encryption.encryptData(textMessage, _encryptionKey)
-        : null;
-    final encryptedImage = imageUrl != null
-        ? Encryption.encryptData(imageUrl, _encryptionKey)
-        : null;
-
     final messageData = {
       'senderId': currentUser.uid,
-      'text': encryptedText,
-      'imageUrl': encryptedImage,
+      'text': textMessage,
+      'imageUrl': imageUrl,
       'timestamp': FieldValue.serverTimestamp(),
     };
 
     try {
+      // Send message to Firestore
       await _firestore
           .collection('chats')
           .doc(widget.chatId)
           .collection('messages')
           .add(messageData);
 
+      // Update the last message in the chat
       await _firestore.collection('chats').doc(widget.chatId).update({
-        'lastMessage': encryptedText ?? encryptedImage ?? 'No message',
+        'lastMessage': imageUrl ?? textMessage ?? 'No message',
         'lastMessageTime': FieldValue.serverTimestamp(),
       });
+
+      // Send local notification
+      _sendLocalNotification(textMessage, imageUrl);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error sending message: $e')),
@@ -77,12 +83,31 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _sendLocalNotification(String? textMessage, String? imageUrl) {
+    // Only send notification if it's not the current user's message
+    AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        channelKey: 'basic_channel',
+        title: _otherUserName ?? 'New Message',
+        body: textMessage ?? (imageUrl != null ? 'Sent an image' : 'New message'),
+        payload: {
+          'chatId': widget.chatId,
+          'otherUserId': widget.otherUserId,
+        },
+        notificationLayout: NotificationLayout.Default,
+      ),
+    );
+  }
+
   Future<void> _pickAndUploadImage() async {
     File? pickedImage = await _imageHandler.pickImage();
     if (pickedImage != null) {
+      // Encode image to Base64
       String? base64Image = await _imageHandler.encodeImageToBase64(pickedImage);
       if (base64Image != null) {
-        _sendMessage(imageUrl: base64Image);
+        // Send the base64-encoded image
+        _sendMessage(imageUrl: base64Image);  // Send only the image data
       } else {
         print("Failed to encode image.");
       }
@@ -128,8 +153,8 @@ class _ChatPageState extends State<ChatPage> {
                       final messageData = messages[index].data() as Map<String, dynamic>;
                       final bool isMe = messageData['senderId'] == _auth.currentUser!.uid;
 
-                      final encryptedImageUrl = messageData['imageUrl'];
-                      final encryptedText = messageData['text'];
+                      // Get the imageUrl (Base64 encoded string) from Firestore
+                      final imageUrl = messageData['imageUrl'];
 
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -143,27 +168,18 @@ class _ChatPageState extends State<ChatPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (encryptedImageUrl != null)
+                              // Display the decoded image only if it exists for this message
+                              if (imageUrl != null)
                                 Image.memory(
-                                  base64Decode(
-                                      Encryption.decryptData(
-                                          encryptedImageUrl,
-                                          _encryptionKey
-                                      )
-                                  ),
-                                  height: 200,
-                                  width: 200,
+                                  base64Decode(imageUrl),
+                                  height: 200, // Optional: set height of the image
+                                  width: 200,  // Optional: set width of the image
                                 ),
-
-                              if (encryptedText != null)
+                              if (messageData['text'] != null)
                                 Text(
-                                  Encryption.decryptData(
-                                      encryptedText,
-                                      _encryptionKey
-                                  ),
+                                  messageData['text'],
                                   style: const TextStyle(fontSize: 16),
                                 ),
-
                               const SizedBox(height: 5),
                               Text(
                                 _formatTimestamp(messageData['timestamp']),
@@ -180,6 +196,7 @@ class _ChatPageState extends State<ChatPage> {
                   );
                 },
               )
+
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
