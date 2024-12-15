@@ -84,20 +84,22 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _sendLocalNotification(String? textMessage, String? imageUrl) {
-    // Only send notification if it's not the current user's message
-    AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
-        channelKey: 'basic_channel',
-        title: _otherUserName ?? 'New Message',
-        body: textMessage ?? (imageUrl != null ? 'Sent an image' : 'New message'),
-        payload: {
-          'chatId': widget.chatId,
-          'otherUserId': widget.otherUserId,
-        },
-        notificationLayout: NotificationLayout.Default,
-      ),
-    );
+    // Check if the current user is not the sender before sending the notification
+    if (_auth.currentUser!.uid == widget.otherUserId) {
+      AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+          channelKey: 'basic_channel',
+          title: _otherUserName ?? 'New Message',
+          body: textMessage ?? (imageUrl != null ? 'Sent an image' : 'New message'),
+          payload: {
+            'chatId': widget.chatId,
+            'otherUserId': widget.otherUserId,
+          },
+          notificationLayout: NotificationLayout.Default,
+        ),
+      );
+    }
   }
 
   Future<void> _pickAndUploadImage() async {
